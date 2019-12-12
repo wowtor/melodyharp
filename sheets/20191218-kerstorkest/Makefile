@@ -17,7 +17,7 @@ all: $(TARGET)
 	pdfunite $(@:.pdf=-cymbaal.pdf) $(@:.pdf=-ly.pdf) $@
 
 wijkomentezamen.svg: wijkomentezamen.ly
-	$(CMD) --scale=.6 --shift=0.03 --title="" $<
+	$(CMD) --scale=.58 --shift=0 --title="" $<
 
 stillenacht.svg: stillenacht.ly
 	$(CMD) --scale=.75 --shift=0 --title="Stille nacht" $<
@@ -38,7 +38,7 @@ vrolijkkerstfeest.svg: vrolijkkerstfeest.ly
 	$(CMD) --scale=.73 --shift=-.07 --title="Vrolijk kerstfeest" $<
 
 herdertjes.svg: herdertjes.ly
-	$(CMD) --scale=.56 --shift=-.01 --title="De herdertjes..." $<
+	$(CMD) --scale=.57 --shift=.005 --title="De herdertjes..." $<
 
 clean:
 	rm -f $(TARGET) $(TARGET:.pdf=-cymbaal.pdf) $(TARGET:.pdf=-ly.pdf) $(TARGET:.pdf=.svg)

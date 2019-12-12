@@ -132,59 +132,12 @@ TONEMAP = {
 Note = collections.namedtuple('Note', ['tone', 'duration', 'dot', 'name'])
 
 
-def get_note(relative, token):
-    tone = None
-    duration = relative.duration
-    dot = False
-
-    m = re.match("^([abcdefgr])(is|e?s)?([',]*)([12468]*)([.]?)$", token)
-
-    if not m:
-        raise ValueError(f'invalid token: {token}')
-
-    noot = m.group(1)
-    base_name = noot
-    if noot == 'r':
-        tone = None
-    else:
-        if m.group(2):
-            if m.group(2) in ['s', 'es']:
-                noot += 'es'
-            else:
-                noot += 'is'
-
-        pitchup = (ord(base_name) - ord(relative.name)) % 7 <= 3
-        relative_octave = 12 * (relative.tone // 12)
-        if pitchup:
-            tone = relative_octave + TONEMAP[noot] - 12
-            while tone < relative.tone and relative.tone - tone > 5:
-                tone += 12
-        else:
-            tone = relative_octave + TONEMAP[noot] + 12
-            while tone > relative.tone and tone - relative.tone > 5:
-                tone -= 12
-
-        for char in m.group(3):
-            if char == ',':
-                tone -= 12
-            else:
-                tone += 12
-
-    if m.group(4):
-        duration = int(m.group(4))
-
-    if m.group(5):
-        dot = True
-
-    return Note(tone, duration, dot, base_name)
-
-
 class RelativeState:
     def __init__(self, parser):
         self._parser = parser
 
     def __call__(self, token):
-        self._parser._relative = get_note(Note(0, 4, False, 'c'), token)
+        self._parser.updateRelative(token)
         self._parser._state = ClosedState(self._parser)
 
 
@@ -221,9 +174,7 @@ class ClosedState:
         elif '|' in token:
             pass
         else:
-            self._parser.notes.append(get_note(self._parser._relative, token))
-            if self._parser.notes[-1].tone is not None:
-                self._parser._relative = self._parser.notes[-1]
+            self._parser.addNote(token)
 
 
 class LilypondParser:
@@ -236,8 +187,83 @@ class LilypondParser:
         for token in tokens:
             self._state(token)
 
+        self.compress()
         return self.notes
-            
+
+    def getPreviousDuration(self):
+        if len(self.notes) > 1:
+            return self.notes[-1].duration
+        else:
+            return 4
+
+    def getPreviousTone(self):
+        for note in reversed(self.notes):
+            if note.tone is not None:
+                return note.tone, note.name
+
+        if self._relative is not None:
+            return self._relative.tone, self._relative.name
+        else:
+            return 0, 'c'
+
+    def getNote(self, token):
+        tone = None
+        duration = self.getPreviousDuration()
+        dot = False
+
+        m = re.match("^([abcdefgr])(is|e?s)?([',]*)([12468]*)([.]?)$", token)
+
+        if not m:
+            raise ValueError(f'invalid token: {token}')
+
+        noot = m.group(1)
+        base_name = noot
+        if noot == 'r':
+            tone = None
+        else:
+            if m.group(2):
+                if m.group(2) in ['s', 'es']:
+                    noot += 'es'
+                else:
+                    noot += 'is'
+
+            relative_tone, relative_name = self.getPreviousTone()
+            pitchup = (ord(base_name) - ord(relative_name)) % 7 <= 3
+            relative_octave = 12 * (relative_tone // 12)
+            if pitchup:
+                tone = relative_octave + TONEMAP[noot] - 12
+                while tone < relative_tone and relative_tone - tone > 5:
+                    tone += 12
+            else:
+                tone = relative_octave + TONEMAP[noot] + 12
+                while tone > relative_tone and tone - relative_tone > 5:
+                    tone -= 12
+
+            for char in m.group(3):
+                if char == ',':
+                    tone -= 12
+                else:
+                    tone += 12
+
+        if m.group(4):
+            duration = int(m.group(4))
+
+        if m.group(5):
+            dot = True
+
+        return Note(tone, duration, dot, base_name)
+
+    def compress(self):
+        first_index = next(i for i, note in enumerate(self.notes) if note.tone is not None)
+        last_index = next(i for i in range(len(self.notes)-1, 0, -1) if self.notes[i].tone is not None)
+        self.notes = self.notes[first_index:last_index+1]
+
+    def addNote(self, token):
+        self.notes.append(self.getNote(token))
+
+    def updateRelative(self, token):
+        self._relative = self.getNote(token)
+
 
 def get_lowest_tone(notes):
     return min(note.tone if note.tone is not None else 2**32 for note in notes)
