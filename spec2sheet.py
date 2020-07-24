@@ -92,7 +92,17 @@ def load_csv(path):
             elif row[0] == 'Notes':
                 break
         for row in reader:
-            notes.append(Note(int(row[0])-1, float(row[1])))
+            base = 0
+            tonemap = [ 0, 2, 4, 6, 7, 9, 11 ]
+
+            line = int(row[0])
+            tone = tonemap[line % 7] + (line//7)*12 + base
+            real_duration = float(row[1])
+            duration = 2 ** math.ceil(math.log2(1/real_duration))
+            dot = 1/duration < real_duration
+            base_name = None
+            note = Note(tone, duration, dot, base_name)
+            notes.append(note)
 
     return title, scale, notes
 
@@ -129,6 +139,12 @@ TONEMAP = {
 }
 
 
+"""
+tone: int: relative tone
+duration: int: 1 / (tone duration without augmentation)
+dot: boolean: indicates extended duration
+base_name: str: name without augmentations (a..g)
+"""
 Note = collections.namedtuple('Note', ['tone', 'duration', 'dot', 'name'])
 
 
@@ -331,20 +347,21 @@ def main():
         title, scale, notes = load_csv(sourcefile)
     elif sourcefile.endswith('.ly'):
         title, scale, notes = load_lilypond(sourcefile)
-        scale = args.scale
-        title = args.title
-        instrument_clef = adjust_clef(instrument_clef, notes)
-
-        symbols = []
-        previous_tone = None
-        for note in notes:
-            symbols.append(get_note_symbol(note, instrument_clef, previous_tone))
-            if note.tone is not None:
-                previous_tone = note.tone
-
-        notes = symbols
     else:
-        raise ValueError(f'unrecognized file: {sourcefile}')
+        raise ValueError(f'{sourcefile}: unrecognized file format')
+
+    scale = args.scale
+    title = args.title
+    instrument_clef = adjust_clef(instrument_clef, notes)
+
+    symbols = []
+    previous_tone = None
+    for note in notes:
+        symbols.append(get_note_symbol(note, instrument_clef, previous_tone))
+        if note.tone is not None:
+            previous_tone = note.tone
+
+    notes = symbols
 
 
     line_offsets = [ 210 - 25 - i*12.5 for i in range(20) ]
