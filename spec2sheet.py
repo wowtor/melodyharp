@@ -37,7 +37,7 @@ class NoteSymbol:
 
 def draw_sheet(dwg, title, scale, notes, line_offsets, shift=0):
     if title is not None:
-        g = dwg.g(style='text-align: center; width: 100%')
+        g = dwg.g(style='font-size: 20pt; text-align: center; width: 100%')
         g.add(dwg.text(title, insert=('80mm', '50mm')))
         dwg.add(g)
 
