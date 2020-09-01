@@ -46,6 +46,9 @@ def draw_sheet(dwg, title, scale, notes, line_offsets, shift=0):
 
     cursor = 0
     for note in notes:
+        if note.line >= len(line_offsets):
+            raise ValueError(f'line {note.line} is out of range (instrument has {len(line_offsets)} lines)')
+
         x = (cursor / total_duration + shift) * total_width
         x -= 297/2
         x *= scale
@@ -303,6 +306,9 @@ def get_note_symbol(note, clef, previous):
     if tone is None:
         tone = clef
 
+    if CLEF[(tone - clef) % 12] is None:
+        raise ValueError(f'tone {(tone - clef) % 12} not supported by instrument')
+
     line = CLEF[(tone - clef) % 12] + 7 * ((tone-clef)//12)
     silent = note.name == 'r'
     return NoteSymbol(line, 1/note.duration * (1.5 if note.dot else 1), silent=silent)
@@ -330,18 +336,38 @@ def get_output_path(path):
         return f'{path}.svg'
 
 
+def get_instrument_clef(value):
+    value = value.lower()
+    clefs = {
+        'c': 0,
+        'd': 2,
+        'e': 4,
+        'f': 5,
+        'g': 7,
+        'a': 8,
+        'b': 10,
+    }
+
+    if value not in clefs:
+        raise ValueError(f'unrecognized instrument clef: {value}')
+
+    return clefs[value]
+
+
 def main():
     parser = argparse.ArgumentParser(description='Melodieharp bladmuziek.')
     parser.add_argument('--title', metavar='TITLE', help='Specify a title')
     parser.add_argument('--output', '-o', metavar='FILE', help='Write SVG output to FILE')
     parser.add_argument('--scale', metavar='FACTOR', default=.7, type=float, help='Scale plot to fit sheet')
     parser.add_argument('--shift', metavar='FACTOR', default=0, type=float, help='Shift plot to fit sheet')
+    parser.add_argument('--clef', metavar='CLEF', default='g', type=str, help='Instrumet clef (default: g)')
     parser.add_argument('file', metavar='FILE', help='Read from FILE (CSV or Lilypond)', nargs=1)
 
     args = parser.parse_args()
 
     sourcefile = args.file[0]
-    instrument_clef = 7
+
+    instrument_clef = get_instrument_clef(args.clef)
 
     if sourcefile.endswith('.csv'):
         title, scale, notes = load_csv(sourcefile)
